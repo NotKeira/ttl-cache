@@ -17,7 +17,7 @@
   "license": "MIT",
   "packageManager": "pnpm@10.19.0",
   "dependencies": {
-    "@notkeira/ttl-cache": "^0.2.0",
+    "@notkeira/ttl-cache": "^0.2.1",
     "@types/node": "^24.9.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"

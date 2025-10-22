@@ -49,8 +49,8 @@ importers:
   examples/cli-cache:
     dependencies:
       '@notkeira/ttl-cache':
-        specifier: ^0.2.0
-        version: 0.2.0(discord.js@14.23.2)(eslint@9.38.0)(typescript@5.9.3)
+        specifier: ^0.2.1
+        version: 0.2.1(discord.js@14.23.2)(eslint@9.38.0)(typescript@5.9.3)
       '@types/node':
         specifier: ^24.9.1
         version: 24.9.1
@@ -600,8 +600,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@notkeira/ttl-cache@0.2.0':
-    resolution: {integrity: sha512-UY4YmDnaZh8RUmPNuUBZgB8gXzGPznZnBXla01bfM0v6mvmjfkP/rwNF7PTDgzcYR2L40LCeUjeXusF4XlGvGg==}
+  '@notkeira/ttl-cache@0.2.1':
+    resolution: {integrity: sha512-+dnTpDiTYC6buhN5iv23R/ouvacuQu5r8vYij18Z30TJPkogNMp31P8bPMguIoGYp91L5rxDgxL+7qBwA/WJmQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       discord.js: ^14.0.0
@@ -2606,7 +2606,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
-  '@notkeira/ttl-cache@0.2.0(discord.js@14.23.2)(eslint@9.38.0)(typescript@5.9.3)':
+  '@notkeira/ttl-cache@0.2.1(discord.js@14.23.2)(eslint@9.38.0)(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/eslint-plugin': 8.46.2(@typescript-eslint/parser@8.46.2(eslint@9.38.0)(typescript@5.9.3))(eslint@9.38.0)(typescript@5.9.3)
       '@typescript-eslint/parser': 8.46.2(eslint@9.38.0)(typescript@5.9.3)
