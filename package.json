@@ -1,13 +1,17 @@
 {
   "name": "@notkeira/ttl-cache",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Lightweight LRU cache with TTL support and optional discord.js Collection compatibility",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "coverage": "jest --coverage"
   },
   "keywords": [
     "cache",
@@ -20,8 +24,10 @@
   "author": "Keira Hopkins <node-pkgs@accounts.keira.boo> (https://keirahopkins.co.uk)",
   "license": "MIT",
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.9.1",
     "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
