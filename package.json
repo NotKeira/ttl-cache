@@ -25,6 +25,8 @@
   "author": "Keira Hopkins <node-pkgs@accounts.keira.boo> (https://keirahopkins.co.uk)",
   "license": "MIT",
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.38.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.9.1",
     "eslint": "^9.38.0",
