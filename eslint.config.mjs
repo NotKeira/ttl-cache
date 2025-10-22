@@ -39,6 +39,5 @@ export default defineConfig([
             "@typescript-eslint/no-unused-vars": ["error", {argsIgnorePattern: "^_"}],
             "@typescript-eslint/no-require-imports": "off"
         },
-        ignorePatterns: ["dist", "node_modules", "coverage", "jest.config.js", "tests"]
     },
 ]);

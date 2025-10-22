@@ -8,8 +8,8 @@
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "prepublishOnly": "pnpm build",
-    "lint": "eslint src tests --ext .ts",
-    "lint:fix": "eslint src tests --ext .ts --fix",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "coverage": "jest --coverage"
