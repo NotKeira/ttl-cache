@@ -220,13 +220,31 @@ export class LRUCache<K, V> {
      */
     values(): IterableIterator<V> {
         this.pruneExpired();
-        const values: V[] = [];
-        for (const entry of this.cache.values()) {
-            if (!this.isExpired(entry)) {
-                values.push(entry.value);
-            }
-        }
-        return values[Symbol.iterator]();
+
+        const self = this;
+        const iterator = this.cache.values();
+
+        return {
+            [Symbol.iterator]() {
+                return this;
+            },
+            next() {
+                let result = iterator.next();
+
+                while (!result.done) {
+                    const entry = result.value;
+                    if (!self.isExpired(entry)) {
+                        return {
+                            value: entry.value,
+                            done: false,
+                        };
+                    }
+                    result = iterator.next();
+                }
+
+                return {value: undefined, done: true};
+            },
+        } as IterableIterator<V>;
     }
 
     /**
@@ -245,13 +263,30 @@ export class LRUCache<K, V> {
      */
     entries(): IterableIterator<[K, V]> {
         this.pruneExpired();
-        const entries: [K, V][] = [];
-        for (const [key, entry] of this.cache) {
-            if (!this.isExpired(entry)) {
-                entries.push([key, entry.value]);
+        const self = this;
+        const iterator = this.cache.entries();
+
+        return {
+            [Symbol.iterator]() {
+                return this;
+            },
+            next() {
+                let result = iterator.next();
+                while (!result.done) {
+                    const [key, entry] = result.value;
+                    if (!self.isExpired(entry)) {
+                        return {
+                            value: [key, entry.value] as [K, V],
+                            done: false
+                        };
+
+                    }
+                    result = iterator.next();
+
+                }
+                return {value: undefined, done: true};
             }
-        }
-        return entries[Symbol.iterator]();
+        } as IterableIterator<[K, V]>
     }
 
     /**
