@@ -1,4 +1,6 @@
-# @notkeira/ttl-cache
+# @NotKeira/ttl-cache
+
+![CI](https://github.com/NotKeira/ttl-cache/workflows/CI/badge.svg)
 
 Lightweight LRU cache with TTL support and optional discord.js Collection compatibility.
 
