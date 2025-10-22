@@ -285,7 +285,7 @@ export class LRUCache<K, V> {
      */
     private getDiscordCollection(): typeof Map {
         try {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
+             
             return require('discord.js').Collection;
         } catch {
             throw new Error(
