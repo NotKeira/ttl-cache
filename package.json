@@ -1,6 +1,6 @@
 {
   "name": "@notkeira/ttl-cache",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Lightweight LRU cache with TTL support and optional discord.js Collection compatibility",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

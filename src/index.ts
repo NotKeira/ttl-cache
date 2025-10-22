@@ -5,7 +5,7 @@
  * TTL (Time To Live) support and discord.js Collection compatibility.
  *
  * @module @notkeira/ttl-cache
- * @version 0.1.0
+ * @version 0.2.0
  * @licence MIT
  * @author Keira Hopkins
  *
@@ -46,4 +46,4 @@ export {
 /**
  * Current version of the ttl-cache package
  */
-export const version = '0.1.0';
+export const version = '0.2.0';

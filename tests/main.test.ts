@@ -2,7 +2,7 @@ import {createCacheEntry, getCacheEntryTTL, isCacheEntryExpired, isDiscordAvaila
 
 describe('Package Exports', () => {
     it('should export version', () => {
-        expect(version).toBe('0.1.0');
+        expect(version).toBe('0.2.0');
     });
 
     it('should export LRUCache class', () => {
