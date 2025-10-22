@@ -46,6 +46,21 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  examples/cli-cache:
+    dependencies:
+      '@notkeira/ttl-cache':
+        specifier: ^0.2.0
+        version: 0.2.0(discord.js@14.23.2)(eslint@9.38.0)(typescript@5.9.3)
+      '@types/node':
+        specifier: ^24.9.1
+        version: 24.9.1
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
 packages:
 
   '@babel/code-frame@7.27.1':
@@ -585,6 +600,15 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
+  '@notkeira/ttl-cache@0.2.0':
+    resolution: {integrity: sha512-UY4YmDnaZh8RUmPNuUBZgB8gXzGPznZnBXla01bfM0v6mvmjfkP/rwNF7PTDgzcYR2L40LCeUjeXusF4XlGvGg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      discord.js: ^14.0.0
+    peerDependenciesMeta:
+      discord.js:
+        optional: true
+
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
@@ -646,9 +670,6 @@ packages:
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
-
-  '@types/node@22.18.12':
-    resolution: {integrity: sha512-BICHQ67iqxQGFSzfCFTT7MRQ5XcBjG5aeKh5Ok38UBbPe5fxTyE+aHFxwVrGyr8GNlqFMLKD1D3P2K/1ks8tog==}
 
   '@types/node@24.9.1':
     resolution: {integrity: sha512-QoiaXANRkSXK6p0Duvt56W208du4P9Uye9hWLWgGMDTEoKPhuenzNcC4vGUmrNkiOKTlIrBoyNQYNpSwfEZXSg==}
@@ -1876,9 +1897,6 @@ packages:
     engines: {node: '>=0.8.0'}
     hasBin: true
 
-  undici-types@6.21.0:
-    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
-
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
@@ -2588,6 +2606,17 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
+  '@notkeira/ttl-cache@0.2.0(discord.js@14.23.2)(eslint@9.38.0)(typescript@5.9.3)':
+    dependencies:
+      '@typescript-eslint/eslint-plugin': 8.46.2(@typescript-eslint/parser@8.46.2(eslint@9.38.0)(typescript@5.9.3))(eslint@9.38.0)(typescript@5.9.3)
+      '@typescript-eslint/parser': 8.46.2(eslint@9.38.0)(typescript@5.9.3)
+    optionalDependencies:
+      discord.js: 14.23.2
+    transitivePeerDependencies:
+      - eslint
+      - supports-color
+      - typescript
+
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
@@ -2657,10 +2686,6 @@ snapshots:
 
   '@types/json-schema@7.0.15': {}
 
-  '@types/node@22.18.12':
-    dependencies:
-      undici-types: 6.21.0
-
   '@types/node@24.9.1':
     dependencies:
       undici-types: 7.16.0
@@ -2669,7 +2694,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 22.18.12
+      '@types/node': 24.9.1
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -4032,8 +4057,6 @@ snapshots:
 
   uglify-js@3.19.3:
     optional: true
-
-  undici-types@6.21.0: {}
 
   undici-types@7.16.0: {}
 
