@@ -1,4 +1,4 @@
-import { LRUCache } from '../src';
+import {LRUCache} from '../src';
 
 describe('Performance Benchmarks', () => {
     it('should handle 10,000 sequential writes efficiently', () => {
@@ -117,7 +117,7 @@ describe('Large Dataset Operations', () => {
         });
 
         for (let i = 0; i < 100000; i++) {
-            cache.set(i, { data: `large-value-${i}`.repeat(10) });
+            cache.set(i, {data: `large-value-${i}`.repeat(10)});
         }
 
         expect(cache.size).toBe(10000);
@@ -174,9 +174,12 @@ describe('Large Dataset Operations', () => {
             expect(value).toBe(`value-${key}`);
         }
         const end = performance.now();
+        const duration = end - start;
+
+        console.log(`Iteration over 50k entries took: ${duration.toFixed(2)}ms`);
 
         expect(count).toBe(50000);
-        expect(end - start).toBeLessThan(1000);
+        expect(duration).toBeLessThan(100);
     });
 
     it('should handle forEach on large dataset', () => {
