@@ -11,16 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ESLint configuration with TypeScript support
 - Linting scripts (`lint` and `lint:fix`) for code quality enforcement
+- ESLint flat config with FlatCompat for modern ESLint 9 support
 
 ### Changed
 
-- ESLint configuration migration from .eslintrc.json to eslint.config.mjs
+- Migrated ESLint configuration from `.eslintrc.json` to `eslint.config.mjs` (flat config format)
+- Excluded tests directory from linting to match TypeScript configuration
 
 ### Fixed
 
 - ESLint errors related to `require()` imports with inline disable comments
 - Type safety improvements by replacing `any` with `typeof Map` for Collection types
-- ESLint configuration to exclude tests directory from project linting
+- ESLint flat config compatibility issues with `ignorePatterns` vs `globalIgnores`
+- TypeScript project parsing errors for test files
 
 ## [0.1.0] - 2025-10-22
 
@@ -65,4 +68,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Codecov integration for coverage reporting
 
 [unreleased]: https://github.com/notkeira/ttl-cache/compare/v0.1.0...HEAD
+
 [0.1.0]: https://github.com/notkeira/ttl-cache/releases/tag/v0.1.0
