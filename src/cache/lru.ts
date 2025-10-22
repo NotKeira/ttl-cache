@@ -221,6 +221,7 @@ export class LRUCache<K, V> {
     values(): IterableIterator<V> {
         this.pruneExpired();
 
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
         const iterator = this.cache.values();
 
@@ -263,6 +264,7 @@ export class LRUCache<K, V> {
      */
     entries(): IterableIterator<[K, V]> {
         this.pruneExpired();
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
         const iterator = this.cache.entries();
 
