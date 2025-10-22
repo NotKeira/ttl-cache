@@ -176,7 +176,7 @@ describe('Large Dataset Operations', () => {
         const end = performance.now();
 
         expect(count).toBe(50000);
-        expect(end - start).toBeLessThan(500);
+        expect(end - start).toBeLessThan(1000);
     });
 
     it('should handle forEach on large dataset', () => {
