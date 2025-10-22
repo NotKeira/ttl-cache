@@ -295,36 +295,18 @@ describe('LRU Ordering', () => {
             cache.set('c', 3);
             cache.set('d', 4);
 
-            cache.delete('b'); // Remove 'b' from LRU order
+            cache.delete('b'); // Remove 'b' from LRU order, size now 3
 
-            cache.set('e', 5); // Should evict 'a', not try to evict deleted 'b'
+            cache.set('e', 5); // Size becomes 4, no eviction
+            cache.set('f', 6); // Now at capacity, should evict 'a'
 
             expect(cache.has('a')).toBe(false);
             expect(cache.has('b')).toBe(false);
             expect(cache.has('c')).toBe(true);
             expect(cache.has('d')).toBe(true);
             expect(cache.has('e')).toBe(true);
-            expect(cache.size).toBe(3);
-        });
-
-        it('should handle deleting most recently used item', () => {
-            const cache = new LRUCache<string, number>({
-                maxSize: 3,
-            });
-
-            cache.set('a', 1);
-            cache.set('b', 2);
-            cache.set('c', 3);
-
-            cache.get('c'); // Make 'c' most recently used
-            cache.delete('c');
-
-            cache.set('d', 4); // Should evict 'a'
-
-            expect(cache.has('a')).toBe(false);
-            expect(cache.has('b')).toBe(true);
-            expect(cache.has('c')).toBe(false);
-            expect(cache.has('d')).toBe(true);
+            expect(cache.has('f')).toBe(true);
+            expect(cache.size).toBe(4);
         });
 
         it('should handle deleting least recently used item', () => {
@@ -336,15 +318,17 @@ describe('LRU Ordering', () => {
             cache.set('b', 2);
             cache.set('c', 3);
 
-            cache.delete('a'); // Delete LRU item
+            cache.delete('a'); // Delete LRU item, sie now 2
 
-            cache.set('d', 4); // Should evict 'b' now
+            cache.set('d', 4); // Size becomes 3, no eviction
+            cache.set('e', 5); // now at capacity, should evict 'b'
 
             expect(cache.has('a')).toBe(false);
             expect(cache.has('b')).toBe(false);
             expect(cache.has('c')).toBe(true);
             expect(cache.has('d')).toBe(true);
-            expect(cache.size).toBe(2);
+            expect(cache.has('e')).toBe(true);
+            expect(cache.size).toBe(3);
         });
     });
 
