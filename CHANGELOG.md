@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2025-10-23
+
+### Added
+- Comments and Documentation added back (oversight from tsconfig)
+
+### Removed
+- `removeComments` from `tsconfig.json`
+
+
+### BREAKING CHANGES
+- Documentation reinstated for build, oversight from `tsconfig.json` removed the comments, which subsequently removed documentation, causing editors to not see the descriptions and nodes of functions or types.
+
 ## [0.2.0] - 2025-10-22
 
 ### Added
@@ -82,5 +94,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Codecov integration for coverage reporting
 
 [unreleased]: https://github.com/notkeira/ttl-cache/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/notkeira/ttl-cache/releases/tag/v0.2.0
+[0.2.1]: https://github.com/notkeira/ttl-cache/compare/v0.2.1...v0.2.0
+[0.2.0]: https://github.com/notkeira/ttl-cache/compare/v0.2.0...v0.1.0
 [0.1.0]: https://github.com/notkeira/ttl-cache/releases/tag/v0.1.0
