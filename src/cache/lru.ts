@@ -283,8 +283,9 @@ export class LRUCache<K, V> {
      * @throws {Error} If discord.js is not installed
      * @private
      */
-    private getDiscordCollection(): any {
+    private getDiscordCollection(): typeof Map {
         try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             return require('discord.js').Collection;
         } catch {
             throw new Error(

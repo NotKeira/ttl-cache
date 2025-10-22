@@ -17,8 +17,9 @@
  * }
  * ```
  */
-export function loadDiscordCollection(): any {
+export function loadDiscordCollection(): typeof Map {
     try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const discordjs = require('discord.js');
 
         if (!discordjs.Collection) {
@@ -51,6 +52,7 @@ export function loadDiscordCollection(): any {
  */
 export function isDiscordAvailable(): boolean {
     try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         require('discord.js');
         return true;
     } catch {
