@@ -7,7 +7,7 @@ on:
 jobs:
   publish:
     name: Publish to NPM
-    runs-on: self-hosted
+    runs-on: linux
     permissions:
       contents: read
       id-token: write
