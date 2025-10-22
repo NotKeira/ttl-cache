@@ -1,7 +1,8 @@
 import type {CacheEntry, LRUCacheOptions} from '../types';
+import {loadDiscordCollection} from '../utils';
 
 /**
- * A Least Recently Used (LRU) cache implementation with optional TTL support.
+ * The Least Recently Used (LRU) cache implementation with optional TTL support.
  *
  * The cache automatically evicts the least recently used entries when the maximum
  * size is reached. Entries can also expire based on a configurable TTL.
@@ -38,7 +39,7 @@ export class LRUCache<K, V> {
         this.keyOrder = [];
 
         if (options.useCollection) {
-            const Collection = this.getDiscordCollection();
+            const Collection = loadDiscordCollection();
             this.cache = new Collection() as Map<K, CacheEntry<V>>;
         } else {
             this.cache = new Map<K, CacheEntry<V>>();
@@ -65,7 +66,7 @@ export class LRUCache<K, V> {
     /**
      * Adds or updates an entry in the cache.
      *
-     * If the key already exists, its value is updated and it's marked as most recently used.
+     * If the key already exists, its value is updated, and it's marked as most recently used.
      * If the cache is at maximum capacity, the least recently used entry is evicted.
      *
      * @param key - The key to set
@@ -273,24 +274,6 @@ export class LRUCache<K, V> {
             if (!this.isExpired(entry)) {
                 callback(entry.value, key, this);
             }
-        }
-    }
-
-    /**
-     * Attempts to load the discord.js Collection class.
-     *
-     * @returns The Collection class from discord.js
-     * @throws {Error} If discord.js is not installed
-     * @private
-     */
-    private getDiscordCollection(): typeof Map {
-        try {
-             
-            return require('discord.js').Collection;
-        } catch {
-            throw new Error(
-                'discord.js not installed. Set useCollection to false or install discord.js.'
-            );
         }
     }
 
