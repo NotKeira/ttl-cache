@@ -5,3 +5,4 @@
  */
 
 export { LRUCache } from './lru';
+export { NamespacedCache } from './namespaced-cache';

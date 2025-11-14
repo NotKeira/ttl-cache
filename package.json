@@ -1,6 +1,6 @@
 {
   "name": "@notkeira/ttl-cache",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Lightweight LRU cache with TTL support and optional discord.js Collection compatibility",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -26,10 +26,10 @@
   "license": "MIT",
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
-    "@eslint/js": "^9.38.0",
+    "@eslint/js": "^9.39.1",
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.9.1",
-    "eslint": "^9.38.0",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.5",
     "tsx": "^4.20.6",
@@ -53,9 +53,9 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "packageManager": "pnpm@10.19.0+sha256.1c5f5ee59267e4e2e1bfd335f432a18dc48f9a9944094d5d2649757e725ad376",
+  "packageManager": "pnpm@10.20.0+sha256.47a3352808501b8d1ef20112273b6a5dcfa53d28a55bcce36d268e878bd6bfe9",
   "dependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.46.2",
-    "@typescript-eslint/parser": "^8.46.2"
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4"
   }
 }

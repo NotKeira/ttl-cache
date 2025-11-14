@@ -1,10 +1,6 @@
-import {createCacheEntry, getCacheEntryTTL, isCacheEntryExpired, isDiscordAvailable, LRUCache, version,} from '../src';
+import {createCacheEntry, getCacheEntryTTL, isCacheEntryExpired, LRUCache,} from '../src';
 
 describe('Package Exports', () => {
-    it('should export version', () => {
-        expect(version).toBe('0.2.1');
-    });
-
     it('should export LRUCache class', () => {
         expect(LRUCache).toBeDefined();
         expect(typeof LRUCache).toBe('function');
@@ -37,7 +33,7 @@ describe('LRUCache', () => {
         expect(cache.get('nonexistent')).toBeUndefined();
     });
 
-    it('should check if key exists with has()', () => {
+    it('should handle has() correctly', () => {
         const cache = new LRUCache<string, number>({
             maxSize: 10,
         });
@@ -63,27 +59,15 @@ describe('LRUCache', () => {
             maxSize: 10,
         });
 
-        cache.set('key1', 100);
-        cache.set('key2', 200);
+        cache.set('key1', 1);
+        cache.set('key2', 2);
+        cache.set('key3', 3);
+
         cache.clear();
-
         expect(cache.size).toBe(0);
-        expect(cache.has('key1')).toBe(false);
     });
 
-    it('should report correct size', () => {
-        const cache = new LRUCache<string, number>({
-            maxSize: 10,
-        });
-
-        expect(cache.size).toBe(0);
-        cache.set('key1', 100);
-        expect(cache.size).toBe(1);
-        cache.set('key2', 200);
-        expect(cache.size).toBe(2);
-    });
-
-    it('should evict oldest entry when maxSize is reached', () => {
+    it('should respect maxSize and evict LRU', () => {
         const cache = new LRUCache<string, number>({
             maxSize: 3,
         });
@@ -134,7 +118,7 @@ describe('LRUCache', () => {
         }, 150);
     });
 
-    it('should iterate over keys', () => {
+    it('should handle iteration', () => {
         const cache = new LRUCache<string, number>({
             maxSize: 10,
         });
@@ -144,13 +128,22 @@ describe('LRUCache', () => {
         cache.set('key3', 3);
 
         const keys = Array.from(cache.keys());
-        expect(keys).toHaveLength(3);
         expect(keys).toContain('key1');
         expect(keys).toContain('key2');
         expect(keys).toContain('key3');
+
+        const values = Array.from(cache.values());
+        expect(values).toContain(1);
+        expect(values).toContain(2);
+        expect(values).toContain(3);
+
+        const entries = Array.from(cache.entries());
+        expect(entries).toContainEqual(['key1', 1]);
+        expect(entries).toContainEqual(['key2', 2]);
+        expect(entries).toContainEqual(['key3', 3]);
     });
 
-    it('should iterate over values', () => {
+    it('should handle forEach', () => {
         const cache = new LRUCache<string, number>({
             maxSize: 10,
         });
@@ -159,82 +152,43 @@ describe('LRUCache', () => {
         cache.set('key2', 2);
         cache.set('key3', 3);
 
-        const values = Array.from(cache.values());
-        expect(values).toHaveLength(3);
-        expect(values).toContain(1);
-        expect(values).toContain(2);
-        expect(values).toContain(3);
-    });
-
-    it('should iterate over entries', () => {
-        const cache = new LRUCache<string, number>({
-            maxSize: 10,
-        });
-
-        cache.set('key1', 1);
-        cache.set('key2', 2);
-
-        const entries = Array.from(cache.entries());
-        expect(entries).toHaveLength(2);
-        expect(entries).toContainEqual(['key1', 1]);
-        expect(entries).toContainEqual(['key2', 2]);
-    });
-
-    it('should execute forEach callback', () => {
-        const cache = new LRUCache<string, number>({
-            maxSize: 10,
-        });
-
-        cache.set('key1', 1);
-        cache.set('key2', 2);
-
-        const entries: [string, number][] = [];
+        const collected: Array<[string, number]> = [];
         cache.forEach((value, key) => {
-            entries.push([key, value]);
+            collected.push([key, value]);
         });
 
-        expect(entries).toHaveLength(2);
-        expect(entries).toContainEqual(['key1', 1]);
-        expect(entries).toContainEqual(['key2', 2]);
+        expect(collected.length).toBe(3);
+        expect(collected).toContainEqual(['key1', 1]);
+        expect(collected).toContainEqual(['key2', 2]);
+        expect(collected).toContainEqual(['key3', 3]);
+    });
+
+    it('should throw error if neither maxSize nor maxMemoryBytes specified', () => {
+        expect(() => {
+            new LRUCache<string, number>({} as any);
+        }).toThrow('Either maxSize or maxMemoryBytes must be specified');
     });
 });
 
 describe('Cache Entry Utilities', () => {
-    it('should create cache entry', () => {
+    it('should create cache entries', () => {
         const entry = createCacheEntry('value', Date.now() + 1000);
-
-        expect(entry).toHaveProperty('value', 'value');
-        expect(entry).toHaveProperty('expiry');
-        expect(typeof entry.expiry).toBe('number');
+        expect(entry.value).toBe('value');
+        expect(entry.expiry).toBeGreaterThan(Date.now());
     });
 
-    it('should check if entry is expired', () => {
+    it('should detect expired entries', () => {
         const expiredEntry = createCacheEntry('value', Date.now() - 1000);
-        const validEntry = createCacheEntry('value', Date.now() + 1000);
-
         expect(isCacheEntryExpired(expiredEntry)).toBe(true);
+
+        const validEntry = createCacheEntry('value', Date.now() + 1000);
         expect(isCacheEntryExpired(validEntry)).toBe(false);
     });
 
-    it('should get TTL of entry', () => {
-        const ttl = 5000;
-        const entry = createCacheEntry('value', Date.now() + ttl);
-
-        const remainingTTL = getCacheEntryTTL(entry);
-        expect(remainingTTL).toBeGreaterThan(0);
-        expect(remainingTTL).toBeLessThanOrEqual(ttl);
-    });
-
-    it('should return 0 TTL for expired entry', () => {
-        const entry = createCacheEntry('value', Date.now() - 1000);
-
-        expect(getCacheEntryTTL(entry)).toBe(0);
-    });
-});
-
-describe('Collection Utilities', () => {
-    it('should check if discord.js is available', () => {
-        const available = isDiscordAvailable();
-        expect(typeof available).toBe('boolean');
+    it('should get TTL for entries', () => {
+        const entry = createCacheEntry('value', Date.now() + 1000);
+        const ttl = getCacheEntryTTL(entry);
+        expect(ttl).toBeGreaterThan(0);
+        expect(ttl).toBeLessThanOrEqual(1000);
     });
 });

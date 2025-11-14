@@ -1,5 +1,13 @@
-import type {CacheEntry, LRUCacheOptions} from '../types';
+import type {
+    CacheEntry,
+    CacheEventCallback,
+    CacheEventType,
+    CacheStats,
+    LRUCacheOptions,
+    SerializedCache,
+} from '../types';
 import {loadDiscordCollection} from '../utils';
+import {LRUList} from '../node/lru-node';
 
 /**
  * The Least Recently Used (LRU) cache implementation with optional TTL support.
@@ -15,34 +23,73 @@ import {loadDiscordCollection} from '../utils';
  * const cache = new LRUCache<string, number>({
  *   maxSize: 100,
  *   ttl: 60000, // 1 minute
+ *   enableStats: true
  * });
  *
  * cache.set('key', 123);
  * const value = cache.get('key'); // 123
+ * console.log(cache.getStats());
  * ```
  */
 export class LRUCache<K, V> {
-    private readonly maxSize: number;
+    private readonly maxSize: number | undefined;
+    private readonly maxMemoryBytes: number | undefined;
     private readonly ttl: number | null;
+    private readonly slidingTTL: boolean;
+    private readonly maxTTL: number | null;
     private readonly cache: Map<K, CacheEntry<V>>;
-    private readonly keyOrder: K[];
+    private readonly keyOrder: LRUList<K>;
+    private readonly enableStats: boolean;
+    private currentMemoryUsage = 0;
+
+    // Background cleanup
+    private cleanupInterval: NodeJS.Timeout | null = null;
+    private readonly autoCleanup: boolean;
+    private readonly cleanupIntervalMs: number;
+
+    // Statistics
+    private stats = {
+        hits: 0,
+        misses: 0,
+        evictions: 0,
+        expirations: 0,
+    };
+
+    // Event listeners
+    private eventListeners: Map<CacheEventType, Array<(...args: any[]) => void>> =
+        new Map();
 
     /**
      * Creates a new LRU cache instance.
      *
      * @param options - Configuration options for the cache
      * @throws {Error} If useCollection is true but discord.js is not installed
+     * @throws {Error} If neither maxSize nor maxMemoryBytes is specified
      */
     constructor(options: LRUCacheOptions) {
+        if (!options.maxSize && !options.maxMemoryBytes) {
+            throw new Error('Either maxSize or maxMemoryBytes must be specified');
+        }
+
         this.maxSize = options.maxSize;
+        this.maxMemoryBytes = options.maxMemoryBytes;
         this.ttl = options.ttl ?? null;
-        this.keyOrder = [];
+        this.slidingTTL = options.slidingTTL ?? false;
+        this.maxTTL = options.maxTTL ?? null;
+        this.autoCleanup = options.autoCleanup ?? false;
+        this.cleanupIntervalMs = options.cleanupInterval ?? 60000;
+        this.enableStats = options.enableStats ?? false;
+        this.keyOrder = new LRUList<K>();
 
         if (options.useCollection) {
             const Collection = loadDiscordCollection();
             this.cache = new Collection() as Map<K, CacheEntry<V>>;
         } else {
             this.cache = new Map<K, CacheEntry<V>>();
+        }
+
+        if (this.autoCleanup && this.ttl !== null) {
+            this.startCleanupTimer();
         }
     }
 
@@ -64,7 +111,41 @@ export class LRUCache<K, V> {
     }
 
     /**
-     * Adds or updates an entry in the cache.
+     * Create cache from serialized JSON data.
+     *
+     * @param json - Serialized cache data
+     * @returns New cache instance
+     *
+     * @example
+     * ```typescript
+     * const cache = LRUCache.fromJSON(json);
+     * ```
+     */
+    static fromJSON<K, V>(json: SerializedCache<K, V>): LRUCache<K, V> {
+        const cache = new LRUCache<K, V>({
+            maxSize: json.maxSize,
+            maxMemoryBytes: json.maxMemoryBytes,
+            ttl: json.ttl ?? undefined,
+            slidingTTL: json.slidingTTL,
+            maxTTL: json.maxTTL ?? undefined,
+        });
+
+        for (const {key, value, expiry, createdAt, size} of json.entries) {
+            // Only restore non-expired entries
+            if (expiry > Date.now()) {
+                cache.cache.set(key, {value, expiry, createdAt, size});
+                cache.keyOrder.push(key);
+                if (size) {
+                    cache.currentMemoryUsage += size;
+                }
+            }
+        }
+
+        return cache;
+    }
+
+    /**
+     * Adds or updates an entry in the cache with default TTL.
      *
      * If the key already exists, its value is updated, and it's marked as most recently used.
      * If the cache is at maximum capacity, the least recently used entry is evicted.
@@ -78,18 +159,62 @@ export class LRUCache<K, V> {
      * ```
      */
     set(key: K, value: V): void {
-        const expiry = this.ttl !== null ? Date.now() + this.ttl : Infinity;
+        this.setWithTTL(key, value, this.ttl ?? undefined);
+    }
 
-        if (this.cache.has(key)) {
-            this.moveToEnd(key);
-        } else {
-            if (this.cache.size >= this.maxSize) {
-                this.evictOldest();
+    /**
+     * Adds or updates an entry in the cache with a custom TTL.
+     *
+     * @param key - The key to set
+     * @param value - The value to cache
+     * @param customTTL - Custom TTL in milliseconds (undefined for no expiry)
+     *
+     * @example
+     * ```typescript
+     * cache.setWithTTL('temp:data', data, 5000); // 5 seconds
+     * ```
+     */
+    setWithTTL(key: K, value: V, customTTL?: number): void {
+        const isUpdate = this.cache.has(key);
+        const expiry = customTTL ? Date.now() + customTTL : Infinity;
+        const createdAt = Date.now();
+        const size = this.maxMemoryBytes ? this.estimateSize(value) : undefined;
+
+        // Remove old entry if updating
+        if (isUpdate) {
+            const oldEntry = this.cache.get(key);
+            if (oldEntry && oldEntry.size) {
+                this.currentMemoryUsage -= oldEntry.size;
             }
-            this.keyOrder.push(key);
         }
 
-        this.cache.set(key, {value, expiry});
+        // Evict entries if necessary
+        if (!isUpdate) {
+            // Memory-based eviction
+            if (this.maxMemoryBytes && size) {
+                while (
+                    this.cache.size > 0 &&
+                    this.currentMemoryUsage + size > this.maxMemoryBytes
+                    ) {
+                    this.evictOldest('memory');
+                }
+            }
+
+            // Size-based eviction
+            if (this.maxSize && this.cache.size >= this.maxSize) {
+                this.evictOldest('size');
+            }
+        }
+
+        // Add/update entry
+        this.cache.set(key, {value, expiry, createdAt, size});
+        this.keyOrder.push(key);
+
+        if (size) {
+            this.currentMemoryUsage += size;
+        }
+
+        this.emit('set', key, value, isUpdate);
     }
 
     /**
@@ -113,15 +238,59 @@ export class LRUCache<K, V> {
         const entry = this.cache.get(key);
 
         if (!entry) {
+            if (this.enableStats) this.stats.misses++;
+            return undefined;
+        }
+
+        // Check absolute max TTL
+        if (this.maxTTL && Date.now() - entry.createdAt > this.maxTTL) {
+            this.deleteEntry(key, entry, 'expire');
+            if (this.enableStats) this.stats.misses++;
             return undefined;
         }
 
         if (this.isExpired(entry)) {
-            this.delete(key);
+            this.deleteEntry(key, entry, 'expire');
+            if (this.enableStats) this.stats.misses++;
             return undefined;
         }
 
-        this.moveToEnd(key);
+        // Sliding TTL: refresh expiry on access
+        if (this.slidingTTL && this.ttl && entry.expiry !== Infinity) {
+            entry.expiry = Date.now() + this.ttl;
+        }
+
+        this.keyOrder.moveToEnd(key);
+        if (this.enableStats) this.stats.hits++;
+        return entry.value;
+    }
+
+    /**
+     * Retrieves a value without updating LRU order or TTL.
+     *
+     * @param key - The key to peek at
+     * @returns The cached value, or undefined if not found or expired
+     *
+     * @example
+     * ```typescript
+     * const value = cache.peek('user:123');
+     * ```
+     */
+    peek(key: K): V | undefined {
+        const entry = this.cache.get(key);
+
+        if (!entry) {
+            return undefined;
+        }
+
+        if (this.maxTTL && Date.now() - entry.createdAt > this.maxTTL) {
+            return undefined;
+        }
+
+        if (this.isExpired(entry)) {
+            return undefined;
+        }
+
         return entry.value;
     }
 
@@ -145,8 +314,13 @@ export class LRUCache<K, V> {
             return false;
         }
 
+        if (this.maxTTL && Date.now() - entry.createdAt > this.maxTTL) {
+            this.deleteEntry(key, entry, 'expire');
+            return false;
+        }
+
         if (this.isExpired(entry)) {
-            this.delete(key);
+            this.deleteEntry(key, entry, 'expire');
             return false;
         }
 
@@ -165,11 +339,12 @@ export class LRUCache<K, V> {
      * ```
      */
     delete(key: K): boolean {
-        const index = this.keyOrder.indexOf(key);
-        if (index > -1) {
-            this.keyOrder.splice(index, 1);
+        const entry = this.cache.get(key);
+        if (!entry) {
+            return false;
         }
-        return this.cache.delete(key);
+
+        return this.deleteEntry(key, entry, 'delete');
     }
 
     /**
@@ -182,7 +357,249 @@ export class LRUCache<K, V> {
      */
     clear(): void {
         this.cache.clear();
-        this.keyOrder.length = 0;
+        this.keyOrder.clear();
+        this.currentMemoryUsage = 0;
+        this.emit('clear');
+    }
+
+    /**
+     * Get remaining TTL for a key in milliseconds.
+     *
+     * @param key - The key to check
+     * @returns Remaining TTL in milliseconds, or null if key doesn't exist or has no expiry
+     *
+     * @example
+     * ```typescript
+     * const ttl = cache.getTTL('user:123');
+     * console.log(`Expires in ${ttl}ms`);
+     * ```
+     */
+    getTTL(key: K): number | null {
+        const entry = this.cache.get(key);
+        if (!entry || entry.expiry === Infinity) {
+            return null;
+        }
+
+        if (this.isExpired(entry)) {
+            this.deleteEntry(key, entry, 'expire');
+            return null;
+        }
+
+        return Math.max(0, entry.expiry - Date.now());
+    }
+
+    /**
+     * Update TTL for an entry without changing its value.
+     *
+     * @param key - The key to update
+     * @param ttl - New TTL in milliseconds (undefined for no expiry)
+     * @returns True if the entry was updated, false if it doesn't exist
+     *
+     * @example
+     * ```typescript
+     * cache.touch('user:123', 30000); // Extend by 30 seconds
+     * ```
+     */
+    touch(key: K, ttl?: number): boolean {
+        const entry = this.cache.get(key);
+        if (!entry || this.isExpired(entry)) {
+            return false;
+        }
+
+        if (ttl !== undefined) {
+            entry.expiry = Date.now() + ttl;
+        } else if (this.ttl) {
+            entry.expiry = Date.now() + this.ttl;
+        }
+
+        this.keyOrder.moveToEnd(key);
+        return true;
+    }
+
+    /**
+     * Get or compute a value if not in cache.
+     *
+     * @param key - The key to get or compute
+     * @param computeFn - Function to compute the value if not cached
+     * @returns The cached or computed value
+     *
+     * @example
+     * ```typescript
+     * const user = await cache.getOrCompute('user:123', async () => {
+     *   return await fetchUser(123);
+     * });
+     * ```
+     */
+    getOrCompute(key: K, computeFn: () => V | Promise<V>): V | Promise<V> {
+        const existing = this.get(key);
+        if (existing !== undefined) {
+            return existing;
+        }
+
+        const computed = computeFn();
+
+        if (computed instanceof Promise) {
+            return computed.then((value) => {
+                this.set(key, value);
+                return value;
+            });
+        }
+
+        this.set(key, computed);
+        return computed;
+    }
+
+    /**
+     * Set multiple entries at once.
+     *
+     * @param entries - Array of [key, value] tuples
+     *
+     * @example
+     * ```typescript
+     * cache.setMany([
+     *   ['key1', 'value1'],
+     *   ['key2', 'value2']
+     * ]);
+     * ```
+     */
+    setMany(entries: Array<[K, V]>): void {
+        for (const [key, value] of entries) {
+            this.set(key, value);
+        }
+    }
+
+    /**
+     * Get multiple entries at once.
+     *
+     * @param keys - Array of keys to retrieve
+     * @returns Map of found entries
+     *
+     * @example
+     * ```typescript
+     * const results = cache.getMany(['key1', 'key2']);
+     * ```
+     */
+    getMany(keys: K[]): Map<K, V> {
+        const results = new Map<K, V>();
+        for (const key of keys) {
+            const value = this.get(key);
+            if (value !== undefined) {
+                results.set(key, value);
+            }
+        }
+        return results;
+    }
+
+    /**
+     * Peek at multiple entries without updating LRU.
+     *
+     * @param keys - Array of keys to peek at
+     * @returns Map of found entries
+     *
+     * @example
+     * ```typescript
+     * const results = cache.peekMany(['key1', 'key2']);
+     * ```
+     */
+    peekMany(keys: K[]): Map<K, V> {
+        const results = new Map<K, V>();
+        for (const key of keys) {
+            const value = this.peek(key);
+            if (value !== undefined) {
+                results.set(key, value);
+            }
+        }
+        return results;
+    }
+
+    /**
+     * Delete multiple entries at once.
+     *
+     * @param keys - Array of keys to delete
+     * @returns Number of entries deleted
+     *
+     * @example
+     * ```typescript
+     * const deleted = cache.deleteMany(['key1', 'key2']);
+     * ```
+     */
+    deleteMany(keys: K[]): number {
+        let deleted = 0;
+        for (const key of keys) {
+            if (this.delete(key)) deleted++;
+        }
+        return deleted;
+    }
+
+    /**
+     * Check existence of multiple keys.
+     *
+     * @param keys - Array of keys to check
+     * @returns Map of key existence status
+     *
+     * @example
+     * ```typescript
+     * const exists = cache.hasMany(['key1', 'key2']);
+     * ```
+     */
+    hasMany(keys: K[]): Map<K, boolean> {
+        const results = new Map<K, boolean>();
+        for (const key of keys) {
+            results.set(key, this.has(key));
+        }
+        return results;
+    }
+
+    /**
+     * Delete entries matching a pattern (for string keys).
+     *
+     * @param pattern - Regular expression pattern
+     * @returns Number of entries deleted
+     *
+     * @example
+     * ```typescript
+     * cache.deleteByPattern(/^user:/); // Delete all user keys
+     * ```
+     */
+    deleteByPattern(pattern: RegExp): number {
+        let deleted = 0;
+        const keysToDelete: K[] = [];
+
+        for (const key of this.cache.keys()) {
+            if (typeof key === 'string' && pattern.test(key)) {
+                keysToDelete.push(key);
+            }
+        }
+
+        for (const key of keysToDelete) {
+            if (this.delete(key)) deleted++;
+        }
+
+        return deleted;
+    }
+
+    /**
+     * Filter cache entries by predicate.
+     *
+     * @param predicate - Function to test each entry
+     *
+     * @example
+     * ```typescript
+     * cache.filter((key, value) => value.active);
+     * ```
+     */
+    filter(predicate: (key: K, value: V) => boolean): void {
+        const keysToDelete: K[] = [];
+
+        for (const [key, entry] of this.cache) {
+            if (!predicate(key, entry.value)) {
+                keysToDelete.push(key);
+            }
+        }
+
+        for (const key of keysToDelete) {
+            this.delete(key);
+        }
     }
 
     /**
@@ -221,7 +638,6 @@ export class LRUCache<K, V> {
     values(): IterableIterator<V> {
         this.pruneExpired();
 
-        // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
         const iterator = this.cache.values();
 
@@ -264,7 +680,6 @@ export class LRUCache<K, V> {
      */
     entries(): IterableIterator<[K, V]> {
         this.pruneExpired();
-        // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
         const iterator = this.cache.entries();
 
@@ -279,16 +694,14 @@ export class LRUCache<K, V> {
                     if (!self.isExpired(entry)) {
                         return {
                             value: [key, entry.value] as [K, V],
-                            done: false
+                            done: false,
                         };
-
                     }
                     result = iterator.next();
-
                 }
                 return {value: undefined, done: true};
-            }
-        } as IterableIterator<[K, V]>
+            },
+        } as IterableIterator<[K, V]>;
     }
 
     /**
@@ -315,6 +728,134 @@ export class LRUCache<K, V> {
     }
 
     /**
+     * Get cache statistics.
+     *
+     * @returns Cache statistics object
+     *
+     * @example
+     * ```typescript
+     * const stats = cache.getStats();
+     * console.log(`Hit rate: ${stats.hitRate * 100}%`);
+     * ```
+     */
+    getStats(): CacheStats {
+        const total = this.stats.hits + this.stats.misses;
+        return {
+            hits: this.stats.hits,
+            misses: this.stats.misses,
+            hitRate: total > 0 ? this.stats.hits / total : 0,
+            evictions: this.stats.evictions,
+            expirations: this.stats.expirations,
+            size: this.size,
+            maxSize: this.maxSize,
+            memoryUsage: this.maxMemoryBytes ? this.currentMemoryUsage : undefined,
+            maxMemory: this.maxMemoryBytes,
+        };
+    }
+
+    /**
+     * Reset cache statistics.
+     *
+     * @example
+     * ```typescript
+     * cache.resetStats();
+     * ```
+     */
+    resetStats(): void {
+        this.stats = {hits: 0, misses: 0, evictions: 0, expirations: 0};
+    }
+
+    /**
+     * Register an event listener.
+     *
+     * @param event - Event type
+     * @param callback - Callback function
+     *
+     * @example
+     * ```typescript
+     * cache.on('evict', (key, value, reason) => {
+     *   console.log(`Evicted ${key} due to ${reason}`);
+     * });
+     * ```
+     */
+    on<E extends CacheEventType>(
+        event: E,
+        callback: CacheEventCallback<K, V>[E]
+    ): void {
+        if (!this.eventListeners.has(event)) {
+            this.eventListeners.set(event, []);
+        }
+        this.eventListeners.get(event)!.push(callback);
+    }
+
+    /**
+     * Remove an event listener.
+     *
+     * @param event - Event type
+     * @param callback - Callback function to remove
+     *
+     * @example
+     * ```typescript
+     * cache.off('evict', myCallback);
+     * ```
+     */
+    off<E extends CacheEventType>(
+        event: E,
+        callback: CacheEventCallback<K, V>[E]
+    ): void {
+        const listeners = this.eventListeners.get(event);
+        if (listeners) {
+            const index = listeners.indexOf(callback);
+            if (index > -1) {
+                listeners.splice(index, 1);
+            }
+        }
+    }
+
+    /**
+     * Serialize cache to JSON.
+     *
+     * @returns Serialized cache data
+     *
+     * @example
+     * ```typescript
+     * const json = cache.toJSON();
+     * ```
+     */
+    toJSON(): SerializedCache<K, V> {
+        return {
+            maxSize: this.maxSize,
+            maxMemoryBytes: this.maxMemoryBytes,
+            ttl: this.ttl,
+            slidingTTL: this.slidingTTL,
+            maxTTL: this.maxTTL,
+            entries: Array.from(this.cache.entries()).map(([key, entry]) => ({
+                key,
+                value: entry.value,
+                expiry: entry.expiry,
+                createdAt: entry.createdAt,
+                size: entry.size,
+            })),
+            keyOrder: this.keyOrder.keys(),
+            stats: this.enableStats ? this.getStats() : undefined,
+        };
+    }
+
+    /**
+     * Dispose of the cache and cleanup resources.
+     *
+     * @example
+     * ```typescript
+     * cache.dispose();
+     * ```
+     */
+    dispose(): void {
+        this.stopCleanupTimer();
+        this.clear();
+        this.eventListeners.clear();
+    }
+
+    /**
      * Checks if a cache entry has expired.
      *
      * @param entry - The cache entry to check
@@ -326,29 +867,55 @@ export class LRUCache<K, V> {
     }
 
     /**
-     * Moves a key to the end of the access order (most recently used).
+     * Evicts the oldest (least recently used) entry from the cache.
      *
-     * @param key - The key to move
+     * @param reason - Reason for eviction ('size' or 'memory')
      * @private
      */
-    private moveToEnd(key: K): void {
-        const index = this.keyOrder.indexOf(key);
-        if (index > -1) {
-            this.keyOrder.splice(index, 1);
+    private evictOldest(reason: 'size' | 'memory'): void {
+        const oldest = this.keyOrder.shift();
+        if (oldest !== undefined) {
+            const entry = this.cache.get(oldest);
+            if (entry) {
+                this.cache.delete(oldest);
+                if (entry.size) {
+                    this.currentMemoryUsage -= entry.size;
+                }
+                if (this.enableStats) this.stats.evictions++;
+                this.emit('evict', oldest, entry.value, reason);
+            }
         }
-        this.keyOrder.push(key);
     }
 
     /**
-     * Evicts the oldest (least recently used) entry from the cache.
+     * Delete an entry and emit appropriate event.
      *
+     * @param key - Key to delete
+     * @param entry - Entry being deleted
+     * @param type - Type of deletion
+     * @returns True if deleted
      * @private
      */
-    private evictOldest(): void {
-        const oldest = this.keyOrder.shift();
-        if (oldest !== undefined) {
-            this.cache.delete(oldest);
+    private deleteEntry(
+        key: K,
+        entry: CacheEntry<V>,
+        type: 'delete' | 'expire'
+    ): boolean {
+        this.keyOrder.remove(key);
+        this.cache.delete(key);
+
+        if (entry.size) {
+            this.currentMemoryUsage -= entry.size;
         }
+
+        if (type === 'expire') {
+            if (this.enableStats) this.stats.expirations++;
+            this.emit('expire', key, entry.value);
+        } else {
+            this.emit('delete', key, entry.value);
+        }
+
+        return true;
     }
 
     /**
@@ -360,13 +927,81 @@ export class LRUCache<K, V> {
         const keysToDelete: K[] = [];
 
         for (const [key, entry] of this.cache) {
-            if (this.isExpired(entry)) {
+            if (
+                this.isExpired(entry) ||
+                (this.maxTTL && Date.now() - entry.createdAt > this.maxTTL)
+            ) {
                 keysToDelete.push(key);
             }
         }
 
         for (const key of keysToDelete) {
-            this.delete(key);
+            const entry = this.cache.get(key);
+            if (entry) {
+                this.deleteEntry(key, entry, 'expire');
+            }
+        }
+    }
+
+    /**
+     * Start background cleanup timer.
+     *
+     * @private
+     */
+    private startCleanupTimer(): void {
+        this.cleanupInterval = setInterval(() => {
+            this.pruneExpired();
+        }, this.cleanupIntervalMs);
+
+        // Prevent Node.js from hanging
+        if (typeof (this.cleanupInterval as any).unref === 'function') {
+            (this.cleanupInterval as any).unref();
+        }
+    }
+
+    /**
+     * Stop background cleanup timer.
+     *
+     * @private
+     */
+    private stopCleanupTimer(): void {
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+            this.cleanupInterval = null;
+        }
+    }
+
+    /**
+     * Estimate memory size of a value in bytes.
+     *
+     * @param value - Value to estimate
+     * @returns Estimated size in bytes
+     * @private
+     */
+    private estimateSize(value: V): number {
+        try {
+            const str = JSON.stringify(value);
+            // UTF-16 uses 2 bytes per character
+            return str.length * 2;
+        } catch {
+            // Fallback for non-serializable objects
+            return 1024; // 1KB default estimate
+        }
+    }
+
+    /**
+     * Emit an event to all registered listeners.
+     *
+     * @param event - Event type
+     * @param args - Event arguments
+     * @private
+     */
+    private emit(event: CacheEventType, ...args: any[]): void {
+        const listeners = this.eventListeners.get(event);
+        if (listeners) {
+            for (const listener of listeners) {
+                listener(...args);
+            }
         }
     }
 }
